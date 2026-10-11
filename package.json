@@ -1,6 +1,6 @@
 {
   "name": "dsh-llm-retry-guard",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "One malformed provider stream must not cost a whole turn: extra {kind:'retry'} recovery on DSH's agent/request-error waterfall for the failure codes the built-in policy never retries (MALFORMED_RESPONSE / STREAM_CLOSED / STREAM_CUT).",
   "keywords": [
     "deepseek-harness",

@@ -69,7 +69,8 @@ $DSH_HOME/llm-retry-guard/status.json
 | `retries` / `byCode` | 一共重试了几次 / 按失败码分 |
 | `exhausted` | 用尽额度、按原样报错的次数 |
 | `traced` / `traceFailed` | 留痕成功 / 被官方不变量拒绝的次数 |
-| `lastCountFrom` | 这次次数是 `session`（会话日志）还是 `memory`（进程内兜底） |
+| `lastCountFrom` | 这次次数**从哪来**：`session`＝读到了会话日志（哪怕这条链还没有上一条，那就从 0 数起）；`memory`＝拿不到 session、退回进程内计数 |
+| `lastPriorRetry` | 会话日志里读到的上一条 `retry`（没有则 `null`） |
 | `lastCode` / `lastMessage` / `lastAt` | 最近一次失败码 / 原文 / 时间 |
 | `policyKey` / `maxRetries` / `codes` | 生效中的链身份与配置 |
 
@@ -77,7 +78,7 @@ $DSH_HOME/llm-retry-guard/status.json
 
 ```bash
 # 一条命令，不需要 git
-dsh plugin --profile web add https://github.com/StarflowDream/dsh-llm-retry-guard/releases/download/v0.2.0/dsh-llm-retry-guard-0.2.0.tgz
+dsh plugin --profile web add https://github.com/StarflowDream/dsh-llm-retry-guard/releases/download/v0.2.1/dsh-llm-retry-guard-0.2.1.tgz
 ```
 
 从本地源码安装：
@@ -113,7 +114,7 @@ dsh plugin --profile web add file:/path/to/dsh-llm-retry-guard
 npm test        # = node --test --test-isolation=none test/*.test.mjs
 ```
 
-15 条用例守两件事：**该重试的必须重试**（`MALFORMED_RESPONSE` 换一次重试，且不再走 `next()`）、**该放行的必须放行**（鉴权/额度/上下文预算原样交给宿主、同一 step 封顶、调用方取消时不动作），外加 0.2.0 的六条（留痕配对、日志计数跨重载、只认自己那条链、`retryId` 延续、留痕被拒不影响判定、`findLastRetry` 键空间）。
+17 条用例守两件事：**该重试的必须重试**（`MALFORMED_RESPONSE` 换一次重试，且不再走 `next()`）、**该放行的必须放行**（鉴权/额度/上下文预算原样交给宿主、同一 step 封顶、调用方取消时不动作），外加 0.2.0 的六条（留痕配对、日志计数跨重载、只认自己那条链、`retryId` 延续、留痕被拒不影响判定、`findLastRetry` 键空间）与 0.2.1 的两条（自证口径 `session`/`memory`、读到上一条就据此递增）。
 
 ## 已知限制
 

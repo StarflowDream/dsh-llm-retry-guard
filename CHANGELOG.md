@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.2.1 — 2026-10-11
+
+### Fixed
+
+- **自证字段 `lastCountFrom` 的语义**：0.2.0 里它只在"日志里确实读到了上一条"时才报 `session`，于是**一条链上的第一次重试**（日志里当然还没有上一条）会被误报成 `memory` —— 事后取证时看起来像"没读会话日志"。现在改成：**只要读得到会话日志就报 `session`**（没有上一条＝从 0 开始数），只有真拿不到 session 才报 `memory`；日志里读到的那个数字另记在新增字段 `lastPriorRetry`（没有则 `null`）。
+- 重试日志那一行也照实说清来源：`会话日志 retry=N` / `会话日志（这条链还没有上一条）` / `进程内计数`。
+- 新增导出 `readSessionEvents(session)` 与 `findLastRetryIn(events, turn, step, provider)`（`findLastRetry()` 保留为便利包装，行为不变）。
+
+### Tests
+
+- 17 条用例（新增 2 条）：能读日志就报 `session`（无上一条时 `lastPriorRetry=null`）、拿不到日志才报 `memory`、读到上一条则记下数字并据此递增。
+
 ## 0.2.0 — 2026-10-11
 
 ### Added

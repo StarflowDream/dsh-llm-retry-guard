@@ -314,3 +314,44 @@ test('findLastRetry 只认同链同 provider 的上一条（键空间契约）',
   assert.equal(findLastRetry({ snapshotEvents: () => { throw new Error('boom') } }, 4, 31, 'deepseek-account'), undefined)
   assert.equal(findLastRetry({ snapshotEvents: () => events }, '4', 31, 'deepseek-account'), undefined)
 })
+
+// ── 0.2.1：自证字段的语义（lastCountFrom 报的是"次数从哪来"，不是"有没有读到上一条"）──
+
+test('② 自证口径：能读会话日志就报 session，哪怕这条链还没有上一条', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'retry-guard-count-'))
+  process.env.DSH_HOME = home
+  const { ctx, listeners } = makeCtx()
+  apply(ctx, {})
+  const session = makeSession() // 有事件面，但日志里没有本插件的上一条
+  await listeners.get('agent/request-error')(withSession('MALFORMED_RESPONSE', session), nextReturns(undefined))
+  await new Promise((resolve) => setTimeout(resolve, 50))
+
+  const status = JSON.parse(await readFile(join(home, 'llm-retry-guard', 'status.json'), 'utf8'))
+  assert.equal(status.lastCountFrom, 'session', '读了会话日志就该报 session')
+  assert.equal(status.lastPriorRetry, null, '日志里没有上一条时该记 null')
+  assert.equal(status.version, '0.2.1')
+})
+
+test('② 自证口径：只有拿不到会话日志才报 memory；读到上一条就记下那个数字', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'retry-guard-count2-'))
+  process.env.DSH_HOME = home
+  const { ctx, listeners } = makeCtx()
+  apply(ctx, {})
+  const handler = listeners.get('agent/request-error')
+
+  // 第一笔：payload 里没有 session → 退回进程内计数
+  await handler(failurePayload('MALFORMED_RESPONSE'), nextReturns(undefined))
+  await new Promise((resolve) => setTimeout(resolve, 50))
+  let status = JSON.parse(await readFile(join(home, 'llm-retry-guard', 'status.json'), 'utf8'))
+  assert.equal(status.lastCountFrom, 'memory')
+  assert.equal(status.lastPriorRetry, null)
+
+  // 第二笔：日志里已有本插件 retry=1 → 次数从日志读，并如实记下 1
+  const session = makeSession([scheduledRetry({ retry: 1 })])
+  await handler(withSession('MALFORMED_RESPONSE', session), nextReturns(undefined))
+  await new Promise((resolve) => setTimeout(resolve, 50))
+  status = JSON.parse(await readFile(join(home, 'llm-retry-guard', 'status.json'), 'utf8'))
+  assert.equal(status.lastCountFrom, 'session')
+  assert.equal(status.lastPriorRetry, 1)
+  assert.equal(session.log.at(-2).data.retry, 2, '日志里是 1，这次就该写 2')
+})
